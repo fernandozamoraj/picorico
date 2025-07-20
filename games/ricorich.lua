@@ -1,3 +1,24 @@
+  -- IMPORTANT: This is a simple slot machine game.
+  -- It is not a real casino game and should not be used for gambling.
+  -- This code is for educational purposes only.
+  -- This game is a work in progress and may contain bugs.
+  -- Please report any issues or suggestions on the GitHub repository.
+  -- This game is inspired by classic slot machines and is meant to be fun and entertaining.
+  -- The game features a simple interface with three reels and a maximum bet of 3.
+  -- The player can spin the reels, increase the bet, and play for a chance to win.
+  -- The game includes a variety of symbols, including cherries, sevens, and wilds.
+  -- The game also includes a jackpot feature and a big win feature.
+  -- The game is designed to be easy to play and understand, with a focus on fun and enjoyment.
+  -- The game is not intended to be a serious gambling game and should not be used as such.
+  -- The game is a simple implementation of a slot machine and does not include advanced features such as free spins, bonus rounds, or progressive jackpots.
+  -- The game is designed to be played in a web browser and can be easily modified and extended.    
+  -- The game is written in Lua and uses the Pico-8 fantasy console for graphics and sound.
+  -- The game is open source and can be found on GitHub.
+  -- The game is a work in progress and may be updated in the future with new features and improvements.
+  --
+  -- 
+  -- Features to be added:
+  --
   -- add payout screens
   -- fix bug with elements on edges of reels
   -- give bonus round spins

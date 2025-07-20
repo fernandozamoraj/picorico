@@ -1,3 +1,15 @@
+--IMPORTANT: This file is part of a game project and should not be modified without understanding the game logic.
+--This file contains the game logic for a space shooter game called "Gaders".
+--The game features player movement, enemy spawning, shooting mechanics, and collision detection.
+--It also includes sound effects, particle effects, and a scoring system.
+--The game is structured with different states such as playing, level complete, and game over.
+--The player can move left, right, and shoot bullets at enemies.
+--Enemies can spawn in different patterns and can be destroyed by player bullets.
+--The game includes features like respawning, health management, and score tracking.
+--The game is designed to be played in a Pico-8 environment.
+--
+--
+-- TODOs and features to implement:
 --features
 --add background
 --done*** have aliens fall at different speeds
