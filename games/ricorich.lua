@@ -87,7 +87,7 @@
 
   wins = {}
   win_timer = 0
-  max_bet_amount = 3
+  max_bet_amount = 5
   win_multiplier = 2
 
   current_btn = buttons.spin  
@@ -189,7 +189,7 @@
   }
 
   is_shuffled = false
-
+  coins_fountain = {}
   --sounds
   sound_jackpot = 5   
   sound_big_win = 6  
@@ -303,17 +303,12 @@
   end
 
   function check_jackpot(row1, row2, row3) 
-    local multiplier = 1
-
-    if bet_amount == max_bet_amount then
-      multiplier = 2
-    end 
 
     if (row1[2] == row2[2] and row2[2] == row3[2] and row3[2] == 1) then 
       add(wins, {
         line = 4,
         symbol = row1[2],
-        win_amount = 1000 * bet_amount * multiplier
+        win_amount = 1000 * win_multiplier
       })
     end 
   end 
@@ -498,6 +493,41 @@
     return win_amount
   end 
 
+  function do_coin_foiuntain()
+    local coins_qty = flr(paid_amount / 10)
+    if #coins_fountain < coins_qty then
+      local x = 30 + flr(rnd(40))
+      local y = 20 + flr(rnd(20))
+      local speedx = flr(rnd(8)) - 4
+      local speedy = (2 + flr(rnd(3)))*-1
+      local gravity = 0.1
+      add(coins_fountain, {x = x, y = y, speedy = speedy, speedx = speedx, gravity = gravity})
+    end
+  end
+
+  function update_coins_fountain()
+    for i = #coins_fountain, 1, -1 do
+      local coin = coins_fountain[i]
+      coin.gravity += (coin.gravity*.3) 
+      coin.speedy += coin.gravity
+      coin.x += coin.speedx
+      coin.y += coin.speedy 
+      coin.y -= coin.gravity
+      if coin.y < 0 then
+        del(coins_fountain, coin)
+      end
+    end
+  end
+
+  function draw_coins_fountain()
+    for coin in all(coins_fountain) do
+      spr(35, coin.x-5, coin.y+12) -- assuming sprite 1 is a coin
+    end
+    for coin in all(coins_fountain) do
+      spr(32+flr(rnd(2)), coin.x, coin.y) -- assuming sprite 1 is a coin
+    end
+  end
+
   function update_reels()
 
     if spin_triggered then
@@ -590,8 +620,9 @@
 
   function _update()
 
+    update_coins_fountain()
     if(win_timer > 0) then
-
+       do_coin_foiuntain()
       if paid_amount > 1000  % win_timer == 149 then
         sfx(sound_jackpot, 1, 1, 10)
       elseif win_timer == 149 then
@@ -664,7 +695,7 @@
     if not is_spinning() and upbet_clicked() then
       if credits > 0 then
         bet_amount += 1
-        if bet_amount > 3 then
+        if bet_amount > 5 then
           bet_amount = 1
         end
         sfx(1)
@@ -672,9 +703,9 @@
     end
 
     if not is_spinning() and maxbet_clicked() then
-      if credits >= 3 then
-        bet_amount = 3
-        credits -= 3
+      if credits >= 5 then
+        bet_amount = 5
+        credits -= 5
         spin_reels()
         sfx(0)
       end
@@ -865,6 +896,8 @@
     if dev_setting_show_help then
       draw_help_screen()
     end
+
+    draw_coins_fountain()
   end
 
 
@@ -873,6 +906,8 @@ function determine_wins_custom(row1, row2, row3)
   local function is_seven_eight(val) return val == 7 or val == 8 end
 
   local function pay_line(line, vals)
+    if bet_amount < line then return end
+
     local a, b, c = vals[1], vals[2], vals[3]
     -- Symbol 1 never wins
     if a == 1 or b == 1 or c == 1 then return end
@@ -892,7 +927,7 @@ function determine_wins_custom(row1, row2, row3)
 
     -- If all are wilds, treat as a win
     if wild_count == 3 then
-      add(wins, {line = line, symbol = 3, win_amount = 3 * win_multiplier * 2})
+      add(wins, {line = line, symbol = 3, win_amount = 3 * win_multiplier})
       return
     end
 
@@ -901,7 +936,9 @@ function determine_wins_custom(row1, row2, row3)
       local win_amount = non_wilds[1] * 10
       if wild_count == 2 then win_amount = win_amount * 2 end
       if wild_count == 3 then win_amount = win_amount * 3 end
+
       add(wins, {line = line, symbol = non_wilds[1], win_amount = win_amount})
+       
       return
     end
 
@@ -918,7 +955,6 @@ function determine_wins_custom(row1, row2, row3)
   pay_line(1, row1)
   pay_line(2, row2)
   pay_line(3, row3)
-  -- Diagonals
   pay_line(4, {row1[1], row2[2], row3[3]})
-  pay_line(5, {row1[3], row2[2], row3[1]})
+  pay_line(5, {row1[3], row2[2], row3[1]}) 
 end
