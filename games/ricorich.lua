@@ -19,24 +19,25 @@
   -- 
   -- Features to be added:
   --
-  -- add payout screens
-  -- fix bug with elements on edges of reels
   -- give bonus round spins
+  -- display big win on anything 20x the bet amount
+  -- 
+  -- DONE add payout screens
+  -- DONE fix bug with elements on edges of reels
   -- free games and increase the odds by changing the reels on any four wild cherries
-  -- 2x is wild and pays out double 
-  -- 2x 2x pays out four times
-  -- make bet 2 4 6 12 18
-  -- pay tables
+  -- DONE 2x is wild and pays out double 
+  -- DONE 2x 2x pays out four times
+  -- NIX make bet 2 4 6 12 18
+  -- DONE pay tables
   --      2x 2x 2x jackpot
   --      7  7  7  black
   --      7  7  7  red
   --    
-  -- problem with seeing symbole 100 and also showing the right payline
-  -- scrolling markee that says good luck but when a win happens it displays the win
+  -- DONE problem with seeing symbole 100 and also showing the right payline
+  -- DONE scrolling markee that says good luck but when a win happens it displays the win
   -- display big win on anything 20x the bet amount
-  -- display big win on anything 20x the bet amount
---- can bet upt to 5 and only the lines played can win...
--- e.g.  bet 1,2,3 or 5... thats the max bet
+  --  DONE can bet upt to 5 and only the lines played can win...
+  -- e.g.  bet 1,2,3 or 5... thats the max bet
   dev_setting_debug_on = false
   dev_setting_ignore_shuffle = false
   dev_setting_use_winner_tables = false
@@ -85,10 +86,14 @@
     upbet   = 4
   }
 
+  free_spins = 0
+  
   wins = {}
   win_timer = 0
   max_bet_amount = 5
   win_multiplier = 2
+
+
 
   current_btn = buttons.spin  
   btn_highlight_color = 7
@@ -198,6 +203,7 @@
   scrolling_text = "Good luck! Spin the reels and try your luck at Rico Rich Casino! Press X to spin, O to increase bet, and [] for max bet. Enjoy the game!"
   
 
+
   function _init()
     if dev_setting_use_winner_tables then
       reel1 = {
@@ -285,6 +291,51 @@
 
   function is_spinning()
     return spin_triggered
+  end
+
+  function get_free_spins()
+
+    if free_spins <= 0 then
+        --do a random number between 1 and free_spin_dice
+        --if free_spin_dice is 10 then it will get free spins 10% of the time
+        local free_spin_dice = 10
+        local target = flr(rnd(free_spin_dice)) + 1
+        
+        if target == 1 then
+        free_spins = 5 --return 5 free spins
+        elseif target == 5 then
+        free_spins = 10 --return 10 free spins
+        elseif target == 10 then
+        free_spins = 15 --return 15 free spins
+        end
+    end      
+  end
+
+  function free_spin_reel()
+    local reel = {}
+    for i = 1, 100 do
+      if i <= 10 then
+        add(reel, 3) --wild cherry
+      elseif i <= 20 then
+        add(reel, 4) --2x wild
+      elseif i <= 30 then
+        add(reel, 5) --3x wild
+      elseif i <= 40 then
+        add(reel, 6) --4x wild
+      elseif i <= 50 then
+        add(reel, 7) --5x wild
+      elseif i <= 60 then
+        add(reel, 8) --6x wild
+      elseif i <= 70 then
+        add(reel, 8) --7s red
+      elseif i <= 80 then
+        add(reel, 4) --7s black
+      else 
+        add(reel, 9) --jackpot symbol
+      end 
+    end
+
+    return reel
   end
 
   function get_reel_stop()
@@ -387,8 +438,48 @@
       row3[1] = reel1[normalize_index(actual_stop_reel1-2)]
       row3[2] = reel2[normalize_index(actual_stop_reel2-2)]
       row3[3] = reel3[normalize_index(actual_stop_reel3-2)]
+     
+      --adjust for free spins
+      if free_spins > 0 then
+        if row1[1] <= 2 then
+            row1[1] += 3
+        end
+        
+        if row1[2] <= 2 then
+            row1[2] += 3
+        end
+
+        if row1[3] <= 2 then
+            row1[3] += 3
+        end
+        if row2[1] <= 2 then
+            row2[1] += 3
+        end
+        
+        if row2[2] <= 2 then
+            row2[2] += 3
+        end
+
+        if row2[3] <= 2 then
+            row2[3] += 3
+        end
+
+        if row3[1] <= 2 then
+            row3[1] += 3
+        end
+        
+        if row3[2] <= 2 then
+            row3[2] += 3
+        end
+
+        if row3[3] <= 2 then
+            row3[3] += 3
+        end
+      end
 
       determine_wins_custom(row1, row2, row3)
+
+      get_free_spins()
     end
   end 
 
@@ -632,6 +723,11 @@
       win_timer -= 1
     else
 
+      free_spins -= 1
+      if free_spins < 0 then
+        free_spins = 0
+      end
+
       sfx(-1, 1, 0)
       update_game()
       
@@ -657,7 +753,7 @@
     update_reels()
 
     btn_click_delay += 1
-
+    
     -- track whether sfx is already playing
     if is_spinning() and not reel_sfx_playing then
       sfx(7, 1) -- play sfx 2 on channel 1 (loop mode should be set in editor)
@@ -681,7 +777,15 @@
       current_btn -= 4
     end
 
-    if not is_spinning() and spin_clicked() then
+    if free_spins <= 0 then
+        --stop sfx 11 playing if free spins are over
+        sfx(-1, 1) -- stop sound on channel 1
+    end
+
+    if not is_spinning() and free_spins > 0 and win_timer <= 0 then
+        spin_reels()
+        sfx(11, 1)     
+    elseif not is_spinning() and spin_clicked() then
       if credits > bet_amount then
         credits -= bet_amount
         spin_reels()
@@ -776,11 +880,39 @@
     --draw symbols on same reel from top to bottom
     --first and last symbols do not count for prizes
     --only the 2nd through fourth symbols are active (lines 1,2, and 3)
-    spr(reel[first_symbol],  30+xoffset, y)
-    spr(reel[second_symbol], 30+xoffset, y+10)
-    spr(reel[third_symbol],  30+xoffset, y+20)
-    spr(reel[fourth_symbol], 30+xoffset, y+30)
-    spr(reel[fifth_symbol],  30+xoffset, y+40)   
+    local a = reel[first_symbol]
+    local b = reel[second_symbol]
+    local c = reel[third_symbol]
+    local d = reel[fourth_symbol]
+    local e = reel[fifth_symbol]
+
+    if free_spins > 0 then   
+      if a <= 2 then
+        a += 3
+      end
+    
+      if b <= 2 then
+        b += 3
+      end
+    
+      if c <= 2 then
+        c += 3
+      end
+    
+      if d <= 2 then
+        d += 3
+      end
+    
+      if e <= 2 then
+        e += 3
+      end
+    end
+
+    spr(a,  30+xoffset, y)
+    spr(b, 30+xoffset, y+10)
+    spr(c,  30+xoffset, y+20)
+    spr(d, 30+xoffset, y+30)
+    spr(e,  30+xoffset, y+40)   
   end
 
   function draw_pay_lines()
