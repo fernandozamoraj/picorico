@@ -11,6 +11,8 @@
 --
 -- TODOs and features to implement:
 --features
+-- fix bug not waiting after game over before it can restart
+--      and the score has to get reset
 --add background
 --done*** have aliens fall at different speeds
 --done*** have aliens follow 4 different patterns
@@ -35,57 +37,107 @@
 --fix it to where a hit loses one gun set
 --add power up to blow entire screen
 --fix double calculation on the scoreboard...it should only add it once not multiple
-player_left = 2
-player_idle = 1
-player_right = 0
-score = 0
-game_state = 0
-level = 1
-enemies_count = 20
-shots_fired_count = 0
-accuracy = 0
-bonus = 0
-enemy_squadron_size = 5 ---fix this to a reasobable value
-max_health = 5
-max_enemys = 11
+--change the rounds to operate in rounds separate from the traditional round
 
---sounds
-sound_level_complete = 10
-sound_compute_kill_score = 11
+function init_game_states()
+  
+  game_states = {
+    game_over = 0,
+    playing = 1,
+    level_complete = 2,
+    playing_bonus = 3  
+  }
 
-after_burner = {}
-meteor_trails = {}
+  normal_level_state = {
+    init = normal_level_init,
+    update = normal_level_update,
+    draw = normal_level_draw,
+    finish = normal_level_finish,
+    game_state = game_states.playing
+  }
 
--- player table
-player = {
-  x = 64,
-  y = 120,
-  spd = 2,
-  sprite = player_idle,
-  alive = false,
-  respawn_timer = 0,
-  lives = 3,
-  health_meter = max_health
-}
+  bonus_level_state = {
+    init = bonus_level_init,
+    update = bonus_level_update,
+    draw = bonus_level_draw,
+    finish = bonus_level_finish,
+    game_state = game_states.playing_bonus  
+  }
 
--- tables
-bullets = {}
-enemy_bullets = {}
-enemies = {}
-particles = {}
+  game_over_state = {
+    init = game_over_init,
+    update = game_over_update,
+    draw = game_over_draw,
+    finish = game_over_finish,
+    game_state = game_states.game_over
+  }
 
-enemy_timer = 0
-meteor_timer = 0
-level_complete_timer = 0
-game_over_state_timer = 0
-enemy_bullet_timer = 0
+  level_complete_state = {
+    init = level_complete_init,
+    update = level_complete_update,
+    draw = level_complete_draw,
+    finish = level_complete_finish,
+    game_state = game_states.level_complete
+  }
 
-game_states = {
-  game_over = 0,
-  playing = 1,
-  level_complete = 2,
-  playing_bonus = 3  
-}
+  current_game_state = game_over_state
+  current_game_state.init()
+end 
+
+function switch_state(new_state)
+  current_game_state.finish()
+  current_game_state = new_state
+  current_game_state.init()
+end 
+
+function _init()
+
+  player_left = 2
+  player_idle = 1
+  player_right = 0
+  score = 0
+  level = 1
+  enemies_count = 20
+  shots_fired_count = 0
+  accuracy = 0
+  bonus = 0
+  enemy_squadron_size = 5 ---fix this to a reasobable value
+  max_health = 5
+  max_enemies = 15
+
+  --sounds
+  sound_level_complete = 10
+  sound_compute_kill_score = 11
+
+  after_burner = {}
+  meteor_trails = {}
+
+  -- player table
+  player = {
+    x = 64,
+    y = 120,
+    spd = 2,
+    sprite = player_idle,
+    alive = false,
+    respawn_timer = 0,
+    lives = 3,
+    health_meter = max_health
+  }
+
+  -- tables
+  bullets = {}
+  enemy_bullets = {}
+  enemies = {}
+  particles = {}
+
+  enemy_timer = 0
+  meteor_timer = 0
+  level_complete_timer = 0
+  game_over_state_timer = 0
+  enemy_bullet_timer = 0
+
+  init_game_states()
+end
 
 function add_after_burner(x, y)
   if(player.alive)then
@@ -93,8 +145,8 @@ function add_after_burner(x, y)
       {
         x = x + flr(rnd(7)),
         y = y + flr(rnd(4)),
-        r = 2,
-        speed = 3 + flr(rnd(3)),
+        r = 1 + rnd(2),
+        speed = 1 + flr(rnd(3)),
         color = 5,
         life = 30+flr(rnd(30))
       })
@@ -151,37 +203,41 @@ end
 --though it is executing some game logic minus
 --handling input
 function play_sfx(soundindex)
-  if not (game_state == game_states.game_over) then 
+  if not (current_game_state.game_state == game_states.game_over) then 
     sfx(soundindex)
   end
 end
 
 function game_over()
   play_sfx(4)  
-  game_state = game_states.game_over
-  game_over_state_timer = 150
-end
+  switch_state(game_over_state)
+end 
 
 function begin_level_complete()
   if enemies_count <= 0 then
-    game_state = game_states.level_complete
-    level_complete_timer = 0
-    bonus = 0
-    accuracy = 0
+    switch_state(level_complete_state)
   end
 end
 
-function start_level()
-  game_state = game_states.playing
-  player.respawn_timer = 300
-  player.health_meter = max_health
-  enemies_count = enemy_squadron_size
-  player.x = mid(0, player.x, 120)
-  shots_fired_count = 0
+--------------------------------------------------------
+--
+-- level complete functions
+--
+--------------------------------------------------------
+function level_complete_init()
+  level_complete_timer = 0
+  accuracy = 0
+  bonus = 0
+  enemy_squadron_size = 5
+  bonus_round_enemy_spawn_count = 0  
 end
 
-function update_level_complete()
-  if game_state == game_states.level_complete then
+function level_complete_finish()
+  -- reset game state
+end
+
+function level_complete_update()
+  if current_game_state.game_state == game_states.level_complete then
     if level_complete_timer == 0 then
       for e in all(enemies) do
         e.y += 1
@@ -194,74 +250,55 @@ function update_level_complete()
     end
 
     --set shot accuracy
-    if level_complete_timer == 50 then
+    if level_complete_timer == 30 then
       play_sfx(sound_compute_kill_score)
       accuracy = flr((20/shots_fired_count)*100)
     end
 
     --set kill score
-    if level_complete_timer == 100 then
+    if level_complete_timer == 60 then
       play_sfx(sound_compute_kill_score)
       bonus = accuracy * 10
       score += bonus
     end
 
     --pause after kill score before level begins
-    if level_complete_timer > 200 then
+    if level_complete_timer > 120  then
       level += 1 
-      start_level()
+      if level > 2 and level % 2 != 0 then
+        switch_state(bonus_level_state)
+      else
+        switch_state(normal_level_state)  
+      end
     end
   end
   
   level_complete_timer += 1
 end
 
-function draw_level_complete()
-  if game_state == game_states.level_complete then
-    if level_complete_timer >= 50 then
- 			print("accuracy: "..accuracy.."%", 46, 55, 7)
-    end
-
-    if level_complete_timer >= 100 then
- 			print("bonus: "..bonus.."!", 46, 65, 7)
-    end
-  end
-end
-
-function start_game()
-  game_state = 1
-  score = 0
-  player.lives = 3
-  player.respawn_timer = 300
-  player.health_meter = max_health
-  enemies_count = enemy_squadron_size
-  level = 1
+function level_complete_draw()
+  cls()
   
-  for e in all(enemies) do
-    e.y += 1
-    if e.y > 0 then 
-      del(enemies, e)
-    end
-  end
+  print("bonus points", 46, 45, 7)
   
-  player.x = mid(0, player.x, 120)
-  shots_fired_count = 0
-end
+  if level_complete_timer >= 50 then
+    print("accuracy: "..accuracy.."%", 46, 55, 7)
+  end
 
-function display_game_over()
-  if game_state == game_states.game_over then
-    rectfill(10, 50, 50, 20, 0)
-    print("game over", 46, 55, 7)
-    print("press x to start", 32, 65, 7)
-    if game_over_state_timer <= 0 and btnp(4) then
-      start_game()
-    end
-  end  
+  if level_complete_timer >= 100 then
+    print("bonus: "..bonus.."!", 46, 65, 7)
+  end
 end
 
 --ships have different possible paths
 --straight down, diagonal left, diagonal right and sine wave path
 function update_enemy_ship_path(e)
+
+  e.dispatch_timer -= 1
+  if e.dispatch_timer > 0 then
+    return
+  end
+  
   if e.path == 1 then
      --do nothing
      e.x += 0
@@ -300,22 +337,25 @@ function spawn_meteors()
   local time_span = 80 - (level*10)
 
   --these are the meteors and there can be only max enemies
-  if meteor_timer > (time_span/2) and #enemies <= max_enemys then
+  if meteor_timer > (time_span/2) and #enemies <= max_enemies then
     meteor_timer = 0
 
     add(enemies, {
-      x = flr(rnd(120)),
-      y = -8,
+      x = flr(rnd(12))*10,
+      y = flr(rnd(4))*8,
       path = flr(rnd(6)),
       speedx = 0,
-      speedy = 1+ flr(rnd(2)),
+      speedy = 1+ flr(rnd(3))/5,
       sp = 10, -- sprite 10 is meteor
-      breakable = false     --this is the main difference between a meteor and a enemy ship
+      breakable = false,     --this is the main difference between a meteor and a enemy ship
+      dispatch_timer = 0
     }) 
   end  
 end
 
+
 function spawn_enemy_space_ships()
+
   -- spawn enemies periodically
   enemy_timer += 1
   meteor_timer += 1
@@ -333,8 +373,94 @@ function spawn_enemy_space_ships()
       speedx = 1+ flr(rnd(3)),
       speedy = 1+ flr(rnd(3)),
       sp = 4 + flr(rnd(5)), -- sprite 4 to 7 
-      breakable = true     
+      breakable = true,
+      dispatch_timer = 0     
     })
+  end
+end 
+
+
+function spawn_bonus_enemies()
+
+  local ready_for_spawn = true
+  for e in all(enemies) do
+    if e.dispatch_timer > 0 then
+      e.dispatch_timer -= 1
+    else
+      e.y += e.speedy
+    end 
+
+    if e.y > 0 then
+      e.dispatched = true
+    end
+    if not e.dispatched or e.y > 0 then
+      ready_for_spawn = false
+    end
+  end
+
+  --only six waves of attacks
+  if ready_for_spawn and  bonus_round_enemy_spawn_count == 6 then
+    switch_state(level_complete_state)
+    return
+  end
+
+  local sequences = {2, 3, 4, 4, 3, 2, 2, 3, 4}
+  if ready_for_spawn then
+    bonus_round_enemy_spawn_count += 1
+    enemy_timer = 0
+
+    first_enemy = {
+      x = flr(rnd(11))*10,
+      y = -8,
+      path = sequences[bonus_round_enemy_spawn_count],
+      speedx = 1.5,
+      speedy = 1.5,
+      sp = 3 + bonus_round_enemy_spawn_count, -- sprite 4 to 7 
+      breakable = true, 
+      dispatch_timer = 10     
+    }
+
+    if first_enemy.sp > 7 then
+      first_enemy.sp = 4 -- limit to sprite 7
+    end
+
+    for i=1, enemy_squadron_size do
+      if i == 1 then
+        add(enemies, first_enemy)
+        add(enemies, {
+          x = first_enemy.x+10,
+          y = first_enemy.y,
+          path = first_enemy.path,
+          speedx = first_enemy.speedx,
+          speedy = first_enemy.speedy,
+          sp = first_enemy.sp,
+          breakable = first_enemy.breakable,
+          dispatch_timer = first_enemy.dispatch_timer
+        })
+      else
+        -- spawn enemies in a line
+        add(enemies, {
+          x = first_enemy.x,
+          y = first_enemy.y,
+          path = first_enemy.path,
+          speedx = first_enemy.speedx,
+          speedy = first_enemy.speedy,
+          sp = first_enemy.sp,
+          breakable = first_enemy.breakable,
+          dispatch_timer = 10*i+10
+        })
+        add(enemies, {
+          x = first_enemy.x+10,
+          y = first_enemy.y,
+          path = first_enemy.path,
+          speedx = first_enemy.speedx,
+          speedy = first_enemy.speedy,
+          sp = first_enemy.sp,
+          breakable = first_enemy.breakable,
+          dispatch_timer = 10*i+10
+        })
+      end
+    end
   end
 end 
 
@@ -345,47 +471,79 @@ end
 
 function detect_player_collision(player, enemy_object, damage)
   player_hit = false
-  if game_state != game_states.game_over then
+  if current_game_state.game_state != game_states.game_over then
     if player.alive and  abs(enemy_object.x - player.x) < 6 and abs(enemy_object.y - player.y) < 6 then
       player_hit = true
       player.health_meter -= damage
       
-      play_sfx(2)	
-
-      if player.health_meter <= 0 then
-        player.alive = false
-        player.respawn_timer = 90
-        player.lives -= 1
-        player.health_meter = max_health
-        if player.lives == 0 then
-          game_over()
-        end 
-      end		   	
+      play_sfx(2)			   	
     end
   end
 
   return player_hit
 end 
 
-function move_player_sideways()
-  if game_state == game_states.playing then  
-    -- player movement
-    if btn(0) then -- left
-      player.x -= player.spd
-      player.sprite = player_left
-    elseif btn(1) then -- right
-      player.x += player.spd
-      player.sprite = player_right
-    else
-      player.sprite = player_idle
-    end
+function is_key_down(char)
+  -- stat(28) returns bitfield of held keys
+  local held = stat(28)
+  local code = ord(char)
+  return band(held, shl(1, code)) != 0
+end
 
-    --up and down travel
-    if btn(3) then -- up
-      player.y += player.spd*3
-    elseif btn(2) then -- down
-      player.y -= player.spd*3
-    end
+function game_over_game_play()
+  update_player_bullets()
+  update_enemy_bullets()
+  spawn_enemies()
+  add_meteor_trails()
+
+  -- update enemies
+  enemy_bullet_timer += 1
+  for e in all(enemies) do   
+    if e.dispatch_timer > 0 then
+      e.dispatch_timer -= 1
+    else
+      e.y += e.speedy
+    end 
+
+    fire_bullets(e)
+    update_enemy_ship_path(e)
+    delete_enemy(e)
+    detect_player_collision(player, e, 4)
+  end
+
+  -- bullet-enemy collision
+  update_particles()
+  update_meteor_trails()
+end
+
+function move_player_sideways()
+
+  local moved_left = btn(0)     -- Left arrow
+  local moved_right = btn(1)    -- Right arrow
+
+  -- Read keyboard inputs using stat(31)
+  local key = stat(28)
+
+  -- Also check if 'A' or 'D' is pressed (using ASCII codes)
+  if is_key_down("a") then moved_left = true end   -- 'a'
+  if is_key_down("d") then moved_right = true end -- 'd'
+
+  -- player movement
+  if moved_left then -- left
+    player.x -= player.spd
+    player.sprite = player_left
+  elseif moved_right then -- right
+    player.x += player.spd
+    player.sprite = player_right
+  else
+    player.sprite = player_idle
+  end
+
+  --up and down travel
+  if btn(3) then -- up
+    player.y += player.spd*3
+  elseif btn(2) then -- down
+    player.y -= player.spd*3
   end
 
   if player.y < 10 then 
@@ -402,12 +560,16 @@ end
 
 function spawn_player()
   player.respawn_timer -= 1
-  if player.respawn_timer <= 0 and not player.alive then
+  if player.lives > 0 and player.respawn_timer <= 0 and not player.alive then
     player.alive = true
   end
 end
 
 function fire_bullets(e) 
+  if bonus_round then
+    return
+  end
+
   if e.breakable and enemy_bullet_timer > 10 then --non breakables i.e. meteors can't shoot bullets
     if e.y == 10 or e.y == 18 or e.y == 26 or e.y == 34 then
       add(enemy_bullets, {
@@ -421,7 +583,13 @@ function fire_bullets(e)
 end 
 
 function delete_enemy(e) 
-  if e.y > 128 then
+ if e.y > 128 then
+    del(enemies, e)
+  end
+end 
+
+function delete_bonus_enemy(e) 
+  if e.dispatched and e.y < 0 then
     del(enemies, e)
   end
 end 
@@ -505,13 +673,28 @@ function detect_enemy_player_bullet_collisions()
   end
 end 
 
-function _update()
+previous_score = 0
 
-  game_over_state_timer -= 1
+---------------------------------------------------
+--
+-- normal level functions
+--
+---------------------------------------------------
+function normal_level_init()
+  player.alive = true
+  player.sprite = player_idle
+  player.respawn_timer = 120
+  player.health_meter = max_health
+  enemy_timer = 0
+  meteor_timer = 0
 
-  display_game_over()
-  update_level_complete()
-  update_after_burner()
+  enemies_count = enemy_squadron_size
+  player.x = mid(0, player.x, 120)
+  player.y = 120
+  shots_fired_count = 0
+end
+
+function normal_level_update()
   spawn_player()
   move_player_sideways()
   add_after_burner(player.x, player.y + 10)
@@ -520,30 +703,240 @@ function _update()
   update_enemy_bullets()
   spawn_enemies()
   add_meteor_trails()
+  update_after_burner()
 
-  if game_state == game_states.playing or game_state == game_states.game_over then
-    -- update enemies
-    enemy_bullet_timer += 1
-    for e in all(enemies) do   
+  -- update enemies
+  enemy_bullet_timer += 1
+  for e in all(enemies) do   
+    if e.dispatch_timer > 0 then
+      e.dispatch_timer -= 1
+    else
       e.y += e.speedy
-      fire_bullets(e)
-      update_enemy_ship_path(e)
-      delete_enemy(e)
-      detect_player_collision(player, e, 4)
-    end
+    end 
 
-    --enemy bullet collision with our ship
-    for eb in all(enemy_bullets) do
-      detect_player_collision(player, eb, 1)     
-    end
-
-    -- bullet-enemy collision
-    detect_enemy_player_bullet_collisions()
-    begin_level_complete()
+    fire_bullets(e)
+    update_enemy_ship_path(e)
+    delete_enemy(e)
+    detect_player_collision(player, e, 4)
   end
 
+  --enemy bullet collision with our ship
+  for eb in all(enemy_bullets) do
+    detect_player_collision(player, eb, 1)     
+  end
+
+  local game_over_triggered = false
+  if player.alive then
+    -- check if player is alive and update health meter
+    if player.health_meter <= 0 then
+      player.alive = false
+      player.respawn_timer = 90
+      player.lives -= 1
+      player.health_meter = max_health
+      if player.lives == 0 then
+        game_over()
+        game_over_triggered = true
+      end 
+    end
+  end
+
+
+  if player.health_meter <= 0 then
+    player.alive = false
+    player.respawn_timer = 90
+    player.lives -= 1
+    player.health_meter = max_health
+    if player.lives == 0 then
+      game_over_triggered = true
+    end 
+  end
+
+  if game_over_triggered then
+      game_over()
+  else 
+        -- bullet-enemy collision
+    detect_enemy_player_bullet_collisions()
+    update_particles()
+    update_meteor_trails()
+    begin_level_complete()
+  end
+end
+
+function normal_level_draw()
+  cls()
+  draw_hud()
+  draw_after_burner()
+
+  -- draw player
+  draw_player()
+  draw_bullets()
+  draw_enemy_ships()
+  draw_meteor_trails()
+  draw_particles()
+end
+
+function normal_level_finish()
+  clear_game_objects()
+
+  -- reset game state
+  player.alive = true
+  player.x = 64
+  player.y = 120
+  player.sprite = player_idle
+  player.respawn_timer = 300
+  enemies_count = enemy_squadron_size
+  enemy_timer = 0
+end
+
+--------------------------------------------------
+--
+--
+-- bonus level functions
+--
+--------------------------------------------------
+
+function bonus_level_init()
+  player.alive = true
+  player.x = 64
+  player.y = 120
+  player.sprite = player_idle
+  player.respawn_timer = 300
+  player.health_meter = max_health
+  enemies_count = 20
+  enemy_timer = 0
+end
+
+function bonus_level_update()
+  spawn_player()
+  move_player_sideways()
+  add_after_burner(player.x, player.y + 10)
+  player_fire()
+  update_player_bullets()
+  spawn_bonus_enemies()
+  
+  for e in all(enemies) do   
+    if e.dispatch_timer > 0 then
+      e.dispatch_timer -= 1
+    else
+      e.y += e.speedy
+      e.dipatched = true
+    end 
+
+    update_enemy_ship_path(e)
+    if e.y > 89 then
+      e.speedy *= -1
+      e.speedx *= -1
+    end
+    delete_bonus_enemy(e)
+    detect_player_collision(player, e, 4)
+  end
+
+  -- bullet-enemy collision
+  detect_enemy_player_bullet_collisions()  
   update_particles()
-  update_meteor_trails()
+  update_after_burner()
+end
+
+
+function bonus_level_draw()
+  cls()
+  draw_hud()
+  draw_after_burner()
+
+  -- draw player
+  draw_player()
+  draw_bullets()
+  draw_enemy_ships()
+  draw_particles()
+end
+
+function bonus_level_finish()
+  -- reset game state
+  player.x = 64
+  player.y = 120
+  player.sprite = player_idle
+  player.respawn_timer = 300
+  enemies_count = enemy_squadron_size
+  enemy_timer = 0
+
+  clear_game_objects()
+  -- reset particles and bullets
+  
+end
+
+function clear_game_objects()
+  for e in all(enemies) do
+    del(enemies, e)
+  end
+
+  for b in all(bullets) do
+    del(bullets, b)
+  end
+  for p in all(particles) do
+    del(particles, p)
+  end
+  for ab in all(after_burner) do
+    del(after_burner, ab)
+  end
+  for mt in all(meteor_trails) do
+    del(meteor_trails, mt)
+  end
+
+  bullets = {}
+  enemy_bullets = {}
+  enemies = {}
+  particles = {}
+end
+--------------------------------------------------------------
+-- game over functions
+--------------------------------------------------------------
+function game_over_init()
+  clear_game_objects()
+  player.alive = false
+  player.x = 64
+  player.y = 120
+  player.sprite = player_idle
+  player.respawn_timer = 300
+  player.health_meter = max_health
+  enemies_count = 0
+  enemy_timer = 0
+  shots_fired_count = 0
+  game_over_timer = 120
+end 
+
+function game_over_update()
+  game_over_timer -= 1
+  if game_over_timer <= 0 and btnp(4) then     
+      switch_state(normal_level_state)
+  else
+    game_over_game_play()
+  end
+end
+
+function game_over_draw()
+  cls()
+
+  spawn_enemies()
+  draw_hud()
+  draw_bullets()
+  draw_enemy_ships()
+  draw_meteor_trails()
+  draw_particles()
+
+  rectfill(10, 50, 50, 20, 0)
+  print("game over", 46, 55, 7)
+  print("press x to start", 32, 65, 7)
+end
+
+function game_over_finish()
+  -- reset game state
+   score = 0
+   level = 1
+   player.lives = 3
+end 
+
+function _update()
+  current_game_state.update()
 end
 
 function repstring(val, n)
@@ -581,14 +974,12 @@ function draw_hud()
 end
 
 function draw_after_burner()
-  if game_state == game_states.playing then 
+  if current_game_state.game_state == game_states.playing then 
     for p in all(after_burner) do 
       circfill(p.x,p.y, p.r, p.color)
     end 
   end 
-  
 end
-
 
 function draw_meteor_trails()
   for m in all(meteor_trails) do 
@@ -597,7 +988,7 @@ function draw_meteor_trails()
 end
 
 function draw_player()
-  if game_state != game_states.game_over then
+  if current_game_state.game_state != game_states.game_over then
     if player.alive then
       spr(player.sprite, player.x, player.y)
     elseif player.respawn_timer % 3 == 0 then
@@ -620,7 +1011,11 @@ end
 function draw_enemy_ships()
   -- draw enemies
   for e in all(enemies) do
-    spr(e.sp, e.x, e.y)
+    if e.speedy < 0 then
+      spr(e.sp, e.x, e.y, 1, 1, false, true) -- flip vertically
+    else 
+      spr(e.sp, e.x, e.y)
+    end
   end
 end 
 
@@ -631,20 +1026,7 @@ function draw_particles()
   end
 end 
 
+
 function _draw()
-  cls()
-  draw_hud()
-  display_game_over()
-  draw_after_burner()
-
-  -- draw player
-  if game_state == game_states.playing or game_state == game_states.game_over then
-    draw_player()
-    draw_bullets()
-    draw_enemy_ships()
-    draw_meteor_trails()
-    draw_particles()
-  end
-
-  draw_level_complete()
+  current_game_state.draw()
 end
