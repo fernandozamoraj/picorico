@@ -121,7 +121,9 @@ function _init()
     alive = false,
     respawn_timer = 0,
     lives = 3,
-    health_meter = max_health
+    health_meter = max_health,
+    twin_guns = false, -- if true, player has double guns
+    v_guns = false -- if true, player has vertical guns
   }
 
   -- tables
@@ -135,6 +137,12 @@ function _init()
   level_complete_timer = 0
   game_over_state_timer = 0
   enemy_bullet_timer = 0
+
+  power_up = {
+    x = 0,
+    y = 0,
+    alive = false
+  }
 
   init_game_states()
 end
@@ -317,6 +325,11 @@ function update_enemy_ship_path(e)
     if e.x > 128 then
       e.x = 128 
     end 
+  elseif e.path == 5 then
+    e.x -= (e.speedx * cos(e.y/128))
+    if e.x > 128 then
+      e.x = 128 
+    end 
   else
   	 local delta = player.x - e.x
   	 if delta > 0 then
@@ -404,18 +417,24 @@ function spawn_bonus_enemies()
     return
   end
 
-  local sequences = {2, 3, 4, 4, 3, 2, 2, 3, 4}
+  local sequences = {2, 3, 4, 5, 2, 3, 4, 5, 2}
+  local x_locations = {20, 100, 20, 100, 20, 100, 20, 100, 20}
+  local enemy_sprites = {4,4,5,5,6,6,7,7,4,4,5,5,6,6,7,7}
   if ready_for_spawn then
     bonus_round_enemy_spawn_count += 1
+    if bonus_round_enemy_spawn_count > #sequences then
+      bonus_round_enemy_spawn_count = 1
+    end
+
     enemy_timer = 0
 
     first_enemy = {
-      x = flr(rnd(11))*10,
+      x = x_locations[bonus_round_enemy_spawn_count],
       y = -8,
       path = sequences[bonus_round_enemy_spawn_count],
       speedx = 1.5,
       speedy = 1.5,
-      sp = 3 + bonus_round_enemy_spawn_count, -- sprite 4 to 7 
+      sp = enemy_sprites[bonus_round_enemy_spawn_count], -- sprite 4 to 7 
       breakable = true, 
       dispatch_timer = 10     
     }
@@ -475,6 +494,9 @@ function detect_player_collision(player, enemy_object, damage)
     if player.alive and  abs(enemy_object.x - player.x) < 6 and abs(enemy_object.y - player.y) < 6 then
       player_hit = true
       player.health_meter -= damage
+
+      player.twin_guns = false -- reset twin guns on hit
+      player.v_guns = false -- reset vertical guns on hit
       
       play_sfx(2)			   	
     end
@@ -600,6 +622,32 @@ function player_fire()
       x = player.x + 4,
       y = player.y - 2
     })
+    if player.twin_guns then
+      add(bullets, {
+        x = player.x + 1,
+        y = player.y - 2
+      })
+      add(bullets, {
+        x = player.x + 7,
+        y = player.y - 2
+      })
+    end
+
+    if player.v_guns then
+      add(bullets, {
+        x = player.x + 2,
+        y = player.y - 2,
+        dx = -1,
+        dy = -2
+      })
+      add(bullets, {
+        x = player.x + 6,
+        y = player.y - 2,
+        dx = 1,
+        dy = -2
+      })
+    end
+
     play_sfx(1)
     shots_fired_count += 1
   end
@@ -608,8 +656,19 @@ end
 function update_player_bullets() 
   -- update bullets
   for b in all(bullets) do
-    b.y -= 4
+
+    if not(b.dx == nil) then
+      b.x += b.dx
+      b.y += b.dy
+    else
+      b.y -= 4
+    end
+
     if b.y < -8 then
+      del(bullets, b)
+    end
+
+    if b.x < 0 or b.x > 128 then
       del(bullets, b)
     end
   end
@@ -695,6 +754,7 @@ function normal_level_init()
 end
 
 function normal_level_update()
+  update_power_up()
   spawn_player()
   move_player_sideways()
   add_after_burner(player.x, player.y + 10)
@@ -770,6 +830,7 @@ function normal_level_draw()
   -- draw player
   draw_player()
   draw_bullets()
+  draw_power_up()
   draw_enemy_ships()
   draw_meteor_trails()
   draw_particles()
@@ -923,7 +984,7 @@ function game_over_draw()
   draw_meteor_trails()
   draw_particles()
 
-  rectfill(10, 50, 50, 20, 0)
+  --rectfill(10, 50, 50, 20, 0)
   print("game over", 46, 55, 7)
   print("press x to start", 32, 65, 7)
 end
@@ -946,6 +1007,48 @@ function repstring(val, n)
   end
 
   return out
+end
+
+
+
+
+function update_power_up()
+  if flr(time()%15) == 0 then
+    if power_up.alive == false then
+      power_up.alive = true
+      power_up.x = flr(rnd(80)) + 20
+      power_up.y = 0
+    end
+  end
+  if power_up.alive then
+    power_up.y += 1
+    if power_up.y > 128 then
+      power_up.alive = false
+    end
+
+    -- check collision with player
+    if abs(power_up.x - player.x) < 6 and abs(power_up.y - player.y) < 6 then
+      player.health_meter = min(player.health_meter + 1, max_health)
+      power_up.alive = false
+      play_sfx(3) -- play power-up sound
+      if player.twin_guns then
+        player.v_guns = true -- if player already has twin guns, give vertical guns
+      end
+      player.twin_guns = true
+    end
+  end
+end
+
+function draw_power_up()
+  if power_up.alive then
+
+    if power_up.y < 0 then
+      return -- don't draw if not on screen
+    end
+
+    local s = 16 + flr(power_up.y/2)%6 
+    spr(s, power_up.x, power_up.y) -- draw power-up sprite
+  end
 end
 
 function draw_hud()
@@ -977,6 +1080,8 @@ function draw_after_burner()
   if current_game_state.game_state == game_states.playing then 
     for p in all(after_burner) do 
       circfill(p.x,p.y, p.r, p.color)
+      circfill(p.x,p.y, p.r-1, 7)
+      
     end 
   end 
 end
