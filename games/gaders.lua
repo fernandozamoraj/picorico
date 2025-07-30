@@ -10,34 +10,37 @@
 --
 --
 -- TODOs and features to implement:
---features
+-- features
 -- fix bug not waiting after game over before it can restart
+-- make game over sound
+-- pause screen after killed
+-- add falling men to capture
 --      and the score has to get reset
---add background
+--add power up to blow entire screen ... maybe hold x button down
+--add killer image for the game
+--limit bullets after 100 bullets a 30 cooldown
+--add repeating game music
+--fix meteors to spawn more evened out
+--after fourth round bring out big ass ship that shoots back
+--done***add background
 --done*** have aliens fall at different speeds
 --done*** have aliens follow 4 different patterns
 --done*** add rock meteors that can't be destrot
---add bonus round after two rounds
+--done*** add bonus round after two rounds
 --done*** add scoring for hit percentage bonus
---add killer image for the game
---add freeman at 1000
---add falling men to capture
---add power when hitting red ones
---give extra guns double barrel
---limit bullets after 100 bullets a 30 cooldown
---add repeating game music
---add leader boards
---make game harder and faster
---after fourth round bring out big ass ship that shoots back
+--done**add freeman at 1000
+--done** add power when hitting red ones
+--done** give extra guns double barrel
+--CANNOT BE DONE add leader boards
 -- constants
 --done** add kamikazes
---add a way to keep track of kills
---add power ups to get v guns
---add power ups to get side guns
---fix it to where a hit loses one gun set
---add power up to blow entire screen
---fix double calculation on the scoreboard...it should only add it once not multiple
---change the rounds to operate in rounds separate from the traditional round
+--done**add a way to keep track of kills
+--done**fix score calculations
+--done** add power ups to get v guns
+--done**add power ups to get side guns
+--done***fix it to where a hit loses one gun set
+--done***fix double calculation on the scoreboard...it should only add it once not multiple
+--done***change the levels to operate in levels separate from the traditional round
 
 function init_game_states()
   
@@ -111,6 +114,10 @@ function _init()
 
   after_burner = {}
   meteor_trails = {}
+  kill_points = {}
+
+  stars_layer_1 = {}
+  stars_layer_2 = {}
 
   -- player table
   player = {
@@ -137,6 +144,8 @@ function _init()
   level_complete_timer = 0
   game_over_state_timer = 0
   enemy_bullet_timer = 0
+  enemies_dispatched = 0
+  enemies_destroyed = 0
 
   power_up = {
     x = 0,
@@ -145,6 +154,115 @@ function _init()
   }
 
   init_game_states()
+end
+
+function add_star_layers()
+  
+  if #stars_layer_1 > 0 or #stars_layer_2 > 0 then
+    return -- don't add stars if they already exist
+  end
+  
+  for i=1, 20 do
+
+    local is_planet = flr(rnd(20)) == 0
+    
+    if is_planet then 
+      add(stars_layer_1, 
+          {
+            x = flr(rnd(128)), 
+            y = flr(rnd(128)),
+            r = flr(rnd(5))+3,
+            speed = 0.3,
+            twinkler = flr(rnd(5)) == 0
+          })
+    end 
+    
+    add(stars_layer_1, 
+     {
+      x = flr(rnd(128)), 
+      y = flr(rnd(128)),
+      r = flr(rnd(2)),
+      speed = 0.3,
+      twinkler = flr(rnd(5)) == 0
+    })
+
+    if i % 2 == 0 then
+      -- alternate layer for more depth
+      add(
+        stars_layer_2, 
+        {
+          x = flr(rnd(128)), 
+          y = flr(rnd(128)),
+          speed = 0.1,
+          r = flr(rnd(2)),
+          twinkler = flr(rnd(5)) == 0
+        })
+    end
+  end
+end
+
+function update_star_layers()
+  for s in all(stars_layer_1) do
+    s.y += s.speed
+    if s.y > 128 then
+      s.y = 0
+      s.x = flr(rnd(128))
+    end
+  end
+
+  for s in all(stars_layer_2) do
+    s.y += s.speed
+    if s.y > 128 then
+      s.y = 0
+      s.x = flr(rnd(128))
+    end
+  end
+end
+
+function draw_star_layers()
+  for s in all(stars_layer_1) do
+    local twinkle = flr(rnd(4)) == 0
+    if not s.twinkler or not twinkle then        
+      circfill(s.x, s.y, s.r, 6)  
+      circfill(s.x, s.y, s.r-1, 7)
+    end 
+  end
+
+  for s in all(stars_layer_2) do
+    local twinkle = flr(rnd(4)) == 0
+    if not s.twinkler or not twinkle then        
+      circfill(s.x, s.y, s.r, 6)  
+      circfill(s.x, s.y, s.r-1, 7)
+    end
+  end
+end
+
+function add_kill_points(x, y, points)
+    add(kill_points,
+      {
+        x = x + flr(rnd(12))-2,
+        y = y + 8,
+        speed = .5,
+        color = 11,
+        life = 20,
+        points = points
+      })
+end
+
+function update_kill_points()
+  for kp in all(kill_points) do
+    kp.y -= kp.speed
+    kp.life -= 1
+    if kp.life <= 0 then
+      del(kill_points, kp)
+    end
+  end
+end
+
+function draw_kill_points()
+  for kp in all(kill_points) do
+    print(""..kp.points, kp.x, kp.y, kp.color)
+  end
 end
 
 function add_after_burner(x, y)
@@ -236,7 +354,10 @@ function level_complete_init()
   level_complete_timer = 0
   accuracy = 0
   bonus = 0
-  enemy_squadron_size = 5
+  enemy_squadron_size = level + 5
+  if enemy_squadron_size > 15 then
+    enemy_squadron_size = 20
+  end
   bonus_round_enemy_spawn_count = 0  
 end
 
@@ -260,7 +381,7 @@ function level_complete_update()
     --set shot accuracy
     if level_complete_timer == 30 then
       play_sfx(sound_compute_kill_score)
-      accuracy = flr((20/shots_fired_count)*100)
+      accuracy = flr((enemies_destroyed/enemies_dispatched)*100)
     end
 
     --set kill score
@@ -361,7 +482,8 @@ function spawn_meteors()
       speedy = 1+ flr(rnd(3))/5,
       sp = 10, -- sprite 10 is meteor
       breakable = false,     --this is the main difference between a meteor and a enemy ship
-      dispatch_timer = 0
+      dispatch_timer = 0,
+      life = 6
     }) 
   end  
 end
@@ -379,6 +501,7 @@ function spawn_enemy_space_ships()
 
   if enemies_count > 0 and enemy_timer > time_span then
     enemy_timer = 0
+    enemies_dispatched += 1
     add(enemies, {
       x = flr(rnd(120)),
       y = -8,
@@ -387,12 +510,13 @@ function spawn_enemy_space_ships()
       speedy = 1+ flr(rnd(3)),
       sp = 4 + flr(rnd(5)), -- sprite 4 to 7 
       breakable = true,
-      dispatch_timer = 0     
+      dispatch_timer = 0,
+      life = 1     
     })
   end
 end 
 
-
+dispatched_enemies = 0
 function spawn_bonus_enemies()
 
   local ready_for_spawn = true
@@ -403,8 +527,9 @@ function spawn_bonus_enemies()
       e.y += e.speedy
     end 
 
-    if e.y > 0 then
+    if e.y > 0 and not e.dispatched then
       e.dispatched = true
+      dispatched_enemies += 1
     end
     if not e.dispatched or e.y > 0 then
       ready_for_spawn = false
@@ -436,7 +561,8 @@ function spawn_bonus_enemies()
       speedy = 1.5,
       sp = enemy_sprites[bonus_round_enemy_spawn_count], -- sprite 4 to 7 
       breakable = true, 
-      dispatch_timer = 10     
+      dispatch_timer = 10,
+      life = 1    
     }
 
     if first_enemy.sp > 7 then
@@ -444,6 +570,7 @@ function spawn_bonus_enemies()
     end
 
     for i=1, enemy_squadron_size do
+      enemies_dispatched += 2
       if i == 1 then
         add(enemies, first_enemy)
         add(enemies, {
@@ -454,7 +581,8 @@ function spawn_bonus_enemies()
           speedy = first_enemy.speedy,
           sp = first_enemy.sp,
           breakable = first_enemy.breakable,
-          dispatch_timer = first_enemy.dispatch_timer
+          dispatch_timer = first_enemy.dispatch_timer,
+          life = 1
         })
       else
         -- spawn enemies in a line
@@ -466,7 +594,8 @@ function spawn_bonus_enemies()
           speedy = first_enemy.speedy,
           sp = first_enemy.sp,
           breakable = first_enemy.breakable,
-          dispatch_timer = 10*i+10
+          dispatch_timer = 10*i+10,
+          life = 1
         })
         add(enemies, {
           x = first_enemy.x+10,
@@ -476,7 +605,8 @@ function spawn_bonus_enemies()
           speedy = first_enemy.speedy,
           sp = first_enemy.sp,
           breakable = first_enemy.breakable,
-          dispatch_timer = 10*i+10
+          dispatch_timer = 10*i+10,
+          life = 1
         })
       end
     end
@@ -495,10 +625,25 @@ function detect_player_collision(player, enemy_object, damage)
       player_hit = true
       player.health_meter -= damage
 
-      player.twin_guns = false -- reset twin guns on hit
-      player.v_guns = false -- reset vertical guns on hit
+      if player.v_guns then
+        -- if player has vertical guns, remove them on hit
+        player.v_guns = false
+      elseif player.twin_guns then
+        -- if player has twin guns, remove them on hit
+        player.twin_guns = false
+      end
       
-      play_sfx(2)			   	
+      play_sfx(8)
+      for i=1,8 do
+          add(particles, {
+            x = player.x + 4,
+            y = player.y + 4,
+            dx = (rnd(2) - 1)*3,
+            dy = (rnd(2) - 1)*3,
+            life = 15,
+            color = 7
+          })
+      end			   	
     end
   end
 
@@ -705,12 +850,20 @@ function detect_enemy_player_bullet_collisions()
         local sound = 2
         del(bullets, b)
         if not e.breakable then
-          color = 6
+          color = 4
           life = 12
+          e.life -= 1
+          if e.life <= 0 then
+            del(enemies, e)
+            score += 10
+            add_kill_points(e.x, e.y, 15)
+          end
         else
           del(enemies, e)
           enemies_count -= 1
           score += 1
+          enemies_destroyed += 1
+          add_kill_points(e.x, e.y, 1)
         end
 
         -- spawn explosion particles
@@ -751,9 +904,13 @@ function normal_level_init()
   player.x = mid(0, player.x, 120)
   player.y = 120
   shots_fired_count = 0
+  enemies_dispatched = 0
+  enemies_destroyed = 0
 end
 
 function normal_level_update()
+  add_star_layers()
+  update_star_layers()
   update_power_up()
   spawn_player()
   move_player_sideways()
@@ -779,6 +936,8 @@ function normal_level_update()
     delete_enemy(e)
     detect_player_collision(player, e, 4)
   end
+
+  update_kill_points()
 
   --enemy bullet collision with our ship
   for eb in all(enemy_bullets) do
@@ -824,6 +983,7 @@ end
 
 function normal_level_draw()
   cls()
+  draw_star_layers()
   draw_hud()
   draw_after_burner()
 
@@ -834,6 +994,7 @@ function normal_level_draw()
   draw_enemy_ships()
   draw_meteor_trails()
   draw_particles()
+  draw_kill_points()
 end
 
 function normal_level_finish()
@@ -865,9 +1026,14 @@ function bonus_level_init()
   player.health_meter = max_health
   enemies_count = 20
   enemy_timer = 0
+  enemmies_dispatched = 0
+  enemies_destroyed = 0
+  enemmy_squadron_size = 10
 end
 
 function bonus_level_update()
+  add_star_layers()
+  update_star_layers()
   spawn_player()
   move_player_sideways()
   add_after_burner(player.x, player.y + 10)
@@ -902,13 +1068,14 @@ end
 function bonus_level_draw()
   cls()
   draw_hud()
-  draw_after_burner()
 
+  draw_star_layers()
   -- draw player
   draw_player()
   draw_bullets()
   draw_enemy_ships()
   draw_particles()
+  draw_after_burner()
 end
 
 function bonus_level_finish()
@@ -959,15 +1126,19 @@ function game_over_init()
   player.sprite = player_idle
   player.respawn_timer = 300
   player.health_meter = max_health
-  enemies_count = 0
+  enemies_count = 5
   enemy_timer = 0
   shots_fired_count = 0
-  game_over_timer = 120
+  game_over_timer = 45
 end 
 
 function game_over_update()
   game_over_timer -= 1
   if game_over_timer <= 0 and btnp(4) then     
+       score = 0
+       level = 1
+       player.lives = 3
+       clear_game_objects()
       switch_state(normal_level_state)
   else
     game_over_game_play()
@@ -991,7 +1162,6 @@ end
 
 function game_over_finish()
   -- reset game state
-   score = 0
    level = 1
    player.lives = 3
 end 
@@ -1077,7 +1247,8 @@ function draw_hud()
 end
 
 function draw_after_burner()
-  if current_game_state.game_state == game_states.playing then 
+  if current_game_state.game_state == game_states.playing or
+     current_game_state.game_state == game_states.playing_bonus then 
     for p in all(after_burner) do 
       circfill(p.x,p.y, p.r, p.color)
       circfill(p.x,p.y, p.r-1, 7)
@@ -1105,7 +1276,23 @@ end
 function draw_bullets() 
   -- draw bullets
   for b in all(bullets) do
-    rectfill(b.x, b.y, b.x+1, b.y+3, 7)
+
+    if not(b.dx == nil) then
+      --if b.dx < 0 then
+        -- draw bullet with left direction
+     --   line(b.x, b.y, b.x + b.dx, b.y + b.dy, 7)
+     -- else
+        -- draw bullet with right direction
+     --   line(b.x+7, b.y, b.x + 1 + b.dx, b.y + b.dy, 7)
+     -- end
+      if b.dx < 0 then
+        line(b.x, b.y, b.x+b.dx, b.y+b.dy, 7)
+      else
+        line(b.x+7, b.y, b.x+7+b.dx, b.y+b.dy, 7)
+      end
+    else
+        rectfill(b.x, b.y, b.x-1, b.y-2, 7)
+    end
   end
 
   for b in all(enemy_bullets) do
