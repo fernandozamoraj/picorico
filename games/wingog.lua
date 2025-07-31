@@ -11,13 +11,13 @@
 --
 -- TODOs and features to implement:
 -- features
--- fix bug not waiting after game over before it can restart
+-- done*** fix bug not waiting after game over before it can restart
 -- make game over sound
 -- pause screen after killed
 -- add falling men to capture
 --      and the score has to get reset
 --add power up to blow entire screen ... maybe hold x button down
---add killer image for the game
+--done**add killer image for the game
 --limit bullets after 100 bullets a 30 cooldown
 --add repeating game music
 --fix meteors to spawn more evened out
@@ -1134,7 +1134,7 @@ end
 
 function game_over_update()
   game_over_timer -= 1
-  if game_over_timer <= 0 and btnp(4) then     
+  if game_over_timer <= 0 and (btnp(4) or btnp(5)) then     
        score = 0
        level = 1
        player.lives = 3
@@ -1154,7 +1154,7 @@ function game_over_draw()
   draw_enemy_ships()
   draw_meteor_trails()
   draw_particles()
-
+  spr(80, 30, 30, 9, 3)
   --rectfill(10, 50, 50, 20, 0)
   print("game over", 46, 55, 7)
   print("press x to start", 32, 65, 7)
