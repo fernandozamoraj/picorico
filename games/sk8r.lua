@@ -65,18 +65,137 @@ function _init()
     current_game_state.init()
 end 
 
+
+function init_playing()
+    jump_puffs = {}
+    prev_btn_x = false
+    jump_puffs = {}
+    map_length = 0
+    player_sprites = {
+        skating_a = 4,
+        skating_b = 6,
+        crouched = 8,
+        nose_grind = 10,
+        wheelie = 32,
+        stale = 34 
+    }
+
+    player = {
+        spr = player_sprites.skating_a,
+        x = 20,
+        y = 20,
+        gravity = 0.2,
+        speed_x = .75,
+        jumped = false,
+        friction = 0.1,
+        jumped_timer = 0     
+    }
+
+    skate_map = {
+        layer_1 = {74,74,74,74,74,72,74,74,74,74,74,74,74,96,98,100,74,74,74,74,74,74,74,74,74,74,102,74,74,74,74,74},
+        layer_2 = {64,64,64,64,64,64,64,64,64,64,64,64,64,64,64, 64,64,64,64,64,64,64,64,64,64,64, 64,64,64,64,64,64}         
+    }
+    map_length = #(skate_map.layer_1)*16;
+    
+    set_map_bearing = function()
+        map_tile = flr(player.x / 16)
+        map_tile_offset = player.x % 16
+        map_tile_length = flr(map_length/16)
+    end 
+
+    set_map_bearing()
+
+end
+
 function update_playing()
+    local skater_map_tile = map_tile + 3
+
+    if skater_map_tile < 1 then 
+        skater_map_tile += map_tile_length
+    end 
+
     player.x += player.speed_x
     if player.x > map_length then 
         player.x = 0
     end 
     set_map_bearing()
+    
+    if not player.jumped and btn(controller.right) then 
+        player.speed_x += .5
+        if player.speed_x > 5 then  
+           player.speed_x = 5     
+        end
+    end 
+
+    --player jump
+    if not player.jumped and prev_btn_x and not btn(controller.down) then 
+        player.gravity = -2
+        prev_btn_x = false
+        player.jumped = true
+        add_jump_puffs()
+        player.spr = player_sprites.stale
+        player.jumped_timer = 85
+        if skate_map.layer_1[skater_map_tile] == 102 then 
+            player.gravity -= 2
+        end 
+    elseif btn(controller.down) then 
+        prev_btn_x = true 
+        player.spr = player_sprites.crouched
+    elseif not player.jumped and skate_map.layer_1[skater_map_tile] == 102 then
+        player.gravity += -3
+    else 
+        prev_btn_x = false
+    end 
+
+    update_jump_puffs()
+
+    player.gravity += .3
+    
+    --apply fricition when rolling
+    if not player.jumped then
+        player.speed_x -= player.friction
+    end 
+
+    if player.speed_x < 1 then 
+        player.speed_x = 1
+    end 
+
+    player.jumped_timer -= 1
+
+    if player.jumped_timer < 0 then 
+        player.jumped_timer = 0
+    end
+
+    if player.jumped and player.jumped_timer > 77 then
+        player.spr = player_sprites.wheelie
+    elseif player.jumped and player.jumped_timer > 60 then 
+        player.spr = player_sprites.stale
+    elseif player.jumped and player.jumped_timer > 50 then 
+        player.spr = player_sprites.skating_a
+    elseif not player.jumped and prev_btn_x then 
+        player.spr = player_sprites.crouched
+    else 
+        player.spr = player_sprites.skating_a
+    end 
+
+    player.y += player.gravity
+    if player.y > 96 then 
+        player.y = 96
+        player.jumped = false
+        player.jumped_timer = 0
+    end
+
+    if skate_map.layer_1[skater_map_tile] == 102 then 
+        if player.y  == 96 then 
+            player.y = 88
+        end 
+    end
 end
 
 function draw_playing()
     cls()
     print(map_length)
-    local map_tile_length = flr(map_length/16)
+    
     print("tile_count"..map_tile_length)
     local current_tile = map_tile
     local current_x = -map_tile_offset
@@ -104,42 +223,48 @@ function draw_playing()
     print("map tile offset "..map_tile_offset)
     print("map length "..map_length)
 
-    spr(player.spr, 50, 96, 2, 2)
+    spr(player.spr, 50, player.y, 2, 2)
+    draw_jump_puffs()
+end
+ 
+function finish_playing()
+end 
+
+function add_jump_puffs()
+
+  for i=1,4 do 
+    add(jump_puffs, {
+
+      life = 45,
+      x = 50 + flr(rnd(12))-2,
+      y = 112,
+      r = 1 + rnd(rnd(3)),
+      speedx = (flr(rnd(4)) - 2)/10,
+      speedy = (flr(rnd(4)) * -1)/10
+    })
+  end
+
 end
 
-function init_playing()
-    map_length = 0
-    player_sprites = {
-        skating_a = 4,
-        skating_b = 6,
-        crouched = 8,
-        nose_grind = 10,
-        wheelie = 32,
-        stale = 34 
-    }
+function update_jump_puffs()
 
-    player = {
-        spr = player_sprites.skating_a,
-        x = 20,
-        y = 20,
-        gravity = .2,
-        speed_x = .75       
-    }
-    skate_map = {
-        layer_1 = {74,74,74,74,74,72,74,74,74,74,74,74,74,96,98,100,74,74,74,74,74,74,74,74,74,74,102,74,74,74,74,74},
-        layer_2 = {64,64,64,64,64,64,64,64,64,64,64,64,64,64,64, 64,64,64,64,64,64,64,64,64,64,64, 64,64,64,64,64,64}         
-    }
-    map_length = #(skate_map.layer_1)*16;
-    
-    set_map_bearing = function()
-        map_tile = flr(player.x / 16)
-        map_tile_offset = player.x % 16
+  for p in all(jump_puffs) do
+
+    if p.life < 0 then 
+       del(jump_puffs, p) 
     end 
 
-    set_map_bearing()
-
+    p.life -= 1
+    p.r -= 0.1
+    p.x += p.speedx
+    p.y += p.speedy
+  end
 end 
-function finish_playing()
+
+function draw_jump_puffs()
+  for p in all(jump_puffs) do 
+    circfill(p.x, p.y, p.r, 7)
+  end 
 end 
 
 function update_tutorial()
