@@ -104,6 +104,8 @@
 
         function init_playing()
 
+            score = 0
+            trick_streak = {}
             varial_timer = 0
             kick_flip_timer = 0
             nose_grab_timer = 0
@@ -207,6 +209,7 @@
                 prev_btn_x = false
                 player.jumped = true
                 add_jump_puffs()
+                sfx(3)
                 player.jumped_timer = 85
                 if skate_map.layer_1[skater_map_tile] == 102 then 
                     player.gravity -= 2
@@ -227,6 +230,7 @@
                 prev_btn_x = false
                 player.jumped = true
                 add_jump_puffs()
+                sfx(3)
                 player.jumped_timer = 85
             else 
                 prev_btn_x = false
@@ -292,12 +296,40 @@
                 player.y = ground_floor
                 player.jumped = false
                 player.jumped_timer = 0
+                if trick_streak_count() > 1 then
+                    add(points, {
+                        val = trick_streak_count() * 250,
+                        x = 40,
+                        y = player.y - 10,
+                        speed_x = -2,
+                        speed_y = -2,
+                        life = 45 
+                    })
+                    sfx(4)
+                end
+                trick_streak = {
+                    air_walk = false,
+                    nose_grab = false,
+                    kick_flip = false,
+                    varial = false   
+                }
             end
 
             update_clouds()
 
             set_skating_sprite()
         end
+
+        function trick_streak_count()
+            local c = 0
+             
+            if trick_streak.air_walk then c += 1 end
+            if trick_streak.nose_grab then c += 1 end
+            if trick_streak.kick_flip then c += 1 end
+            if trick_streak.varial then c += 1 end
+
+            return c
+        end 
 
         previous_points_x = 0
         function add_points(v)
@@ -309,6 +341,7 @@
                 previous_points_x = 0
             end 
 
+            score += v
             add(points,
                 {
                     val = v,
@@ -334,21 +367,41 @@
         end 
 
         function draw_points() 
+            print("score ", 2, 2, colors.red)
+            print(""..score, 2, 12, colors.white)
+
             for p in all(points) do     
                print(" "..p.val, p.x, p.y, colors.white)
             end        
         end 
 
         function update_kick_flip() 
+
             kick_flip_timer -= 1
             if kick_flip_timer < 0 then 
                 kick_flip_timer = 0
             end
+
+            --ignore kickflip if other btns are pressed
+            if btn(controller.btn1) or btn(controller.btn2) then
+                return
+            end 
+
             if kick_flip_timer == 0 and 
             btn(controller.down) and 
             player.jumped then 
                 kick_flip_timer = 10
-                add_points(10*flr(((128-player.y)/10)))
+                
+                --tricks only count when on air higher than 80
+                if player.y < 80 then
+                    trick_streak.kick_flip = true
+                    sfx(3)
+                    add_points(100)
+                else 
+                    add_points(10)
+                    sfx(5)
+                end 
+                 
             end
         end
 
@@ -361,7 +414,15 @@
             btn(controller.right) and 
             player.jumped then 
                 varial_timer = 10
-                add_points(10*flr(((128-player.y)/10)))
+                    
+                if player.y < 80 then
+                    trick_streak.varial = true
+                    sfx(3)
+                    add_points(100)
+                else 
+                    add_points(10)
+                    sfx(5)
+                end 
             end
         end
 
@@ -375,7 +436,14 @@
             btn(controller.btn1) and 
             player.jumped then 
                 air_walk_timer = 10
-                add_points(20*flr(((128-player.y)/10)))
+                if player.y < 80 then    
+                    trick_streak.air_walk = true
+                    add_points(100)
+                    sfx(3)
+                else 
+                    add_points(20)
+                    sfx(5)
+                end
             end
         end 
 
@@ -389,7 +457,15 @@
             btn(controller.btn2) and 
             player.jumped then 
                 nose_grab_timer = 10
-                add_points(10*flr(((128-player.y)/10)))
+                
+                if player.y < 80 then
+                    trick_streak.nose_grab = true
+                    add_points(20)
+                    sfx(3)
+                else 
+                    add_points(20)
+                    sfx(5)
+                end 
             end
         end 
 
