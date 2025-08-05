@@ -147,8 +147,9 @@
             }
 
             skate_map = {
-                layer_1 = {74,74,74,74,74,72,74,74,74,74,74,74,74,96,98,100,74,74,74,74,74,74,74,74,74,74,102,74,74,74,74,74},  
-                layer_2 = {64,64,64,64,64,64,64,64,64,64,64,64,64,64,64, 64,64,64,64,64,64,64,64,64,64,64, 64,64,64,64,64,64}         
+                layer_0 = {136,136,136,128,132,136,136,136,132,136,128,136,136,136,136,132,136,136,136,136,136,136,128,136,128,136,136,128,136,128,132,132,132},
+                layer_1 = { 74, 74, 74, 74, 74, 72, 74, 74, 74, 74, 74, 74, 74, 96, 98,100, 74, 74, 74, 74, 74, 74, 74, 74, 74, 74,102, 74, 74, 74, 74, 74},  
+                layer_2 =  {64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64}         
             }
 
             map_length = #(skate_map.layer_1)*16;
@@ -503,6 +504,7 @@
             end
 
             for i = map_tile, end_tile do 
+                spr(skate_map.layer_0[current_tile], current_x, current_y-16, 4, 4)
                 spr(skate_map.layer_1[current_tile], current_x, current_y, 2, 2)
                 spr(skate_map.layer_2[current_tile], current_x, current_y+16, 2, 2)
                 
@@ -590,6 +592,22 @@
         function determine_ground_floor()
             ground_floor = 96;
             if 
+                player.y < 81
+                and 
+                (( 
+                    skate_map.layer_0[skater_map_tile] >= 132
+                    and 
+                    skate_map.layer_0[skater_map_tile] <= 134 
+                )
+                or
+                ( 
+                    skate_map.layer_0[skater_map_tile_pre] >= 132
+                    and 
+                    skate_map.layer_0[skater_map_tile_pre] <= 134 
+                ))
+            then
+                ground_floor = 70
+            elseif 
                 player.y < 91
                 and 
                 (( 
