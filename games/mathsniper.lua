@@ -209,20 +209,34 @@ function update_explosions()
 end
 
 function update_player_movement()
+  local btn_pressed = false
+  local speed_increase = .3
   if btn(controller.left) then
+    player.speed += speed_increase
     player.x -= player.speed
+    btn_pressed = true
   end
   
   if btn(controller.right) then
+    player.speed += speed_increase
     player.x += player.speed
+    btn_pressed = true
   end
   
   if btn(controller.up) then
+    player.speed += speed_increase
     player.y -= player.speed
+    btn_pressed = true
   end
   
   if btn(controller.down) then
+    player.speed += speed_increase
     player.y += player.speed
+    btn_pressed = true
+  end
+
+  if not btn_pressed then 
+    player.speed = 2
   end
 
   if(player.y < 10) then
@@ -361,12 +375,13 @@ function draw_gameover()
 
   cls(colors.dark_blue)
 
-  print("let's play mathwiz!", 20, 40, colors.dark_purple)
-  print("let's play mathwiz!", 19, 39, colors.orange)
+  print("let's play Math Sniper!", 20, 40, colors.dark_purple)
+  print("let's play Math Sniper!", 19, 39, colors.orange)
 
   print("Timer: "..timers.gameover, 20, 50, colors.dark_purple)
   print("Timer: "..timers.gameover, 19, 49, colors.orange)
 
+  
   if timers.gameover <= 0 then
     print("press (❎) to start", 20, 60, colors.dark_purple)
     print("press (❎) to start", 19, 59, colors.orange)
@@ -380,6 +395,8 @@ function draw_playing()
   end  
 
   cls(colors.dark_blue)
+
+  circfill(player.x+3, player.y+3, 30, colors.blue)
 
   print("Count Down: " ..((timer_settings.play_round-game.timer)/30), 10, 20, colors.dark_purple)
   print("Count Down: " ..((timer_settings.play_round-game.timer)/30),  9, 19, colors.orange)
@@ -395,7 +412,6 @@ function draw_playing()
     print("final score! ", 49,39, colors.orange)
   end
   
-  circfill(player.x+3, player.y+3, 20, colors.blue)
 
   if #explosions <= 0 then
 	  for c in all(choices) do
