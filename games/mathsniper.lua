@@ -2,23 +2,22 @@ debug_mode = false
 
 colors = {
    black = 0, --black
-   dark_blue = 1, --white
-   dark_purple = 2, --red
-   dark_green = 3, --green
-   brown = 4, --blue
-   dark_gray = 5, --yellow
-   light_gray = 6, --orange
-   white = 7, --pink
-   red = 8, --purple
-   orange = 9, --brown
-   yellow = 10,--gray
-   green =  11,--light gray
-   blue = 12,--dark gray
-   indigo = 13,--light blue
-   pink = 14,--light green
-   peach = 15,--light red
+   dark_blue = 1, 
+   dark_purple = 2, 
+   dark_green = 3, 
+   brown = 4, 
+   dark_gray = 5, 
+   light_gray = 6, 
+   white = 7, 
+   red = 8, 
+   orange = 9, 
+   yellow = 10,
+   green =  11,
+   blue = 12,
+   indigo = 13,
+   pink = 14,
+   peach = 15,
 }
-
 
 function _init()
   player = {
@@ -109,7 +108,8 @@ function spawn_choices()
 	 local op = flr(rnd(4))+1
 	 
 	 if op == 4 then
-	 	
+
+    --division requires a different way to get the calculation
 	 	answer = {
 		 	 a = n1*n2,
 		 	 b = n2,
@@ -118,6 +118,18 @@ function spawn_choices()
 		 }
 	 else 
 	 
+     local temp = 0
+
+     -- for subraction we only want positive answers
+     --swap n1 and n2 when subtracting 
+     --to keep left value higher than right value
+     --and answer positive
+     if n2 > n1  and answer.op == "-" then 
+       temp = n1 
+       n1 = n2 
+       n2 = temp
+     end 
+
 		 answer = {
 		 	 a = n1,
 		 	 b = n2,
@@ -141,7 +153,9 @@ function spawn_choices()
           y = (row*18)+15,
           r = 5,
           val = flr(rnd(36))*3+2,
-          selected = false     
+          selected = false,    
+          speedx = flr(rnd(3)) - 1.5,
+          speedy = flr(rnd(3)) - 1.5 
         })	
       end
       
@@ -160,7 +174,10 @@ function spawn_choices()
           y = (row*18)+15,
           r = 5,
           val = flr(rnd(22))*5+5,
-          selected = false     
+          selected = false,
+          selected = false,    
+          speedx = flr(rnd(3)) - 1.5,
+          speedy = flr(rnd(3)) - 1.5      
         })	
       end 
       grid[""..gridpos] = true
@@ -172,6 +189,8 @@ function spawn_choices()
     local gridpos = flr(rnd(25))
     local row = flr(gridpos/5)+1
     local col = flr(gridpos%5)+1
+    --add the value only in an empty space
+    --otherwise keep trying
     if grid[""..gridpos] == nil then    
       add(choices,
           {
@@ -179,7 +198,10 @@ function spawn_choices()
             y = (row*18)+15,
             r = 5,
             val = answer.answer,
-            selected = false     
+            selected = false,
+          selected = false,    
+          speedx = flr(rnd(3)) - 1.5,
+          speedy = flr(rnd(3)) - 1.5      
           })
       added = true
     end
@@ -320,6 +342,29 @@ function update_player_shot()
   end	   	 
 end
 
+function update_choices()
+
+  for c in all(choices) do 
+    c.x += c.speedx 
+    c.y += c.speedy
+
+    if c.x > 130 and c.speedx > 0 then 
+      c.x = -10
+    end 
+
+    if c.x < 0 and c.speedx < 0 then 
+      c.x = 129
+    end 
+
+    if c.y < -10 and c.speedy < 0 then 
+      c.y = 128
+    end 
+    if c.y > 128 and c.speedy > 0 then 
+      c.y = -10
+    end 
+  end
+end
+
 function update_playing()
   if game_state == game_states.playing then
     game.timer += 1
@@ -332,6 +377,7 @@ function update_playing()
         check_for_gameover()
     else
       spawn_choices()
+      update_choices()
       update_player_movement()
       update_player_target()
       update_player_shot()	
