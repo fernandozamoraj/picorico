@@ -71,6 +71,7 @@ function _init()
   game_state = game_states.gameover
   timers.start_level = 45
 
+  bullets = {}
 end
 
 
@@ -310,11 +311,54 @@ function update_player_target()
     
     --check collicion and select the choice
     --very brute force
-    if abs((player.x+c.r/2)-c.x) < 7 then
-      if abs((player.y+c.r/2)-c.y) < 7 then
+    if abs((player.x+c.r)-c.x) < 7 then
+      if abs((player.y+c.r)-c.y) < 7 then
         c.selected = true
       end
     end
+  end
+end 
+
+function shoot(x, y)
+
+  if #bullets <= 0 then
+    local from = {x = 64, y = 128}
+    local to   = {x =  x, y = y}
+
+    local deltax = (to.x-from.x)/7
+    local deltay = (to.y-from.y)/7
+
+
+    add(bullets, 
+      {
+        x = from.x,
+        y = from.y,
+        speedx = deltax,
+        speedy = deltay,
+        r = 8,
+        target_x = x,
+        target_y = y
+      }
+    )
+  end
+end
+
+function update_bullets()
+  for b in all(bullets) do 
+    b.x += b.speedx
+    b.y += b.speedy
+    b.r -= .6
+    if(b.y <= b.target_y) then 
+      del(bullets, b) 
+      game.misses += 1
+      sfx(4)
+    end
+  end   
+end
+
+function draw_bullets()
+  for b in all(bullets) do 
+    circfill(b.x, b.y, b.r, colors.red)
   end
 end 
 
@@ -332,34 +376,41 @@ end
 
 function update_player_shot()
 
-  --if player took the shot...
   if btnp(controller.btn1) then
-    local hit = false
+    shoot(player.x+4, player.y+4)
+  end 
+  --if player took the shot...
+  if #bullets > 0 then
     
+    local hit = false
     --could be simplified using mget
     for c in all(choices) do
-      if c.selected then
+      if 
+        --c.selected and
+        abs(c.x - bullets[1].x+3) < 8 and 
+        abs(c.y - bullets[1].y+3) < 8
+      then
         --do not break because there may be more than
         --one overlay on top of the other
         if c.val == answer.answer then
           hit = true
         end
+        
       end 	 	 	 
     end
 
     --destroy all choices
     --todo: make it like fire works deleteing one at a time
     --randomly
+    spawn_explosion(player.x+4, player.y+4)
     if hit then 
       spawn_exploded_numbers()
       --delete all explosions
       for c in all(choices) do  	 	 	  
         del(choices, c)
       end
-    else 
-      for c in all(choices) do  	 	 	  
-        del(choices, c)
-        spawn_explosion(c.x, c.y)
+      for b in all(bullets) do  	 	 	  
+        del(bullets, b)
       end
     end
 
@@ -369,9 +420,6 @@ function update_player_shot()
     if hit then 
       game.hits += 1
       sfx(3)
-    else
-      game.misses += 1
-      sfx(4)
     end 
   end	   	 
 end
@@ -407,6 +455,7 @@ function update_playing()
     --allows to finish out explosions
     update_explosions()	   
     update_exploded_numbers()	 
+    update_bullets()
     
     if game.timer >= timer_settings.play_round then
         check_for_gameover()
@@ -504,8 +553,7 @@ function draw_playing()
         print(""..c.val, c.x-c.r/2, c.y-c.r/2, colors.blue)
       else
         print(""..c.val, c.x-c.r/2, c.y-c.r/2, colors.black)
-      end
-	  	
+      end	
 	  end 
   end
   
@@ -516,6 +564,8 @@ function draw_playing()
     circfill(e.x-2, e.y-2, e.r+0, colors.white)      
   end
   
+  draw_bullets()
+
   -- draw player
   local crosshairs_color = colors.red
   circ(player.x+3, player.y+3, 9, crosshairs_color)
