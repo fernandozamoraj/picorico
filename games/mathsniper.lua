@@ -53,8 +53,8 @@ function _init()
      left = 0,
      down = 3,
      up = 2,
-     btn1 = 4,
-     btn2 = 5
+     btn1 = 5,
+     btn2 = 4
   }
 
   answer = {
@@ -66,6 +66,7 @@ function _init()
         
   choices = {}
   explosions = {}
+  exploded_numbers = {}
   
   game_state = game_states.gameover
   timers.start_level = 45
@@ -209,6 +210,31 @@ function spawn_choices()
   end
 end
 
+function spawn_exploded_numbers()
+  for c in all(choices) do
+    add(exploded_numbers,
+      {
+        x = c.x,
+        y = c.y,
+        gravity = -4,
+        val = c.val,
+        speedx = c.speedx
+      }
+     )
+  end
+end
+
+function update_exploded_numbers()
+  for x in all(exploded_numbers) do 
+    x.gravity += .2
+    x.y += x.gravity
+    x.x += x.speedx
+    if x.y < 10 then 
+      del(exploded_numbers, x)
+    end 
+  end
+end 
+
 function spawn_explosion(x, y)
 	 add(explosions, 
 	    {
@@ -298,7 +324,7 @@ function check_for_gameover()
     spawn_explosion(c.x, c.y) 		
   end
   --switch to gameover  	 		
-  if game.timer > timer_settings.gameover then
+  if game.timer > (timer_settings.play_round + timer_settings.gameover) then
     game_state = game_states.gameover  	 			
     timers.gameover = 45 
   end
@@ -322,11 +348,19 @@ function update_player_shot()
     end
 
     --destroy all choices
-    --TODO: make it like fire works deleteing one at a time
+    --todo: make it like fire works deleteing one at a time
     --randomly
-    for c in all(choices) do  	 	 	  
-      del(choices, c)
-      spawn_explosion(c.x, c.y)
+    if hit then 
+      spawn_exploded_numbers()
+      --delete all explosions
+      for c in all(choices) do  	 	 	  
+        del(choices, c)
+      end
+    else 
+      for c in all(choices) do  	 	 	  
+        del(choices, c)
+        spawn_explosion(c.x, c.y)
+      end
     end
 
     --update his or misses
@@ -371,7 +405,8 @@ function update_playing()
 
     --explosions must happen even if timer exceeded
     --allows to finish out explosions
-    update_explosions()	   	 
+    update_explosions()	   
+    update_exploded_numbers()	 
     
     if game.timer >= timer_settings.play_round then
         check_for_gameover()
@@ -421,11 +456,11 @@ function draw_gameover()
 
   cls(colors.dark_blue)
 
-  print("let's play Math Sniper!", 20, 40, colors.dark_purple)
-  print("let's play Math Sniper!", 19, 39, colors.orange)
+  print("let's play math sniper!", 20, 40, colors.dark_purple)
+  print("let's play math sniper!", 19, 39, colors.orange)
 
-  print("Timer: "..timers.gameover, 20, 50, colors.dark_purple)
-  print("Timer: "..timers.gameover, 19, 49, colors.orange)
+  print("timer: "..timers.gameover, 20, 50, colors.dark_purple)
+  print("timer: "..timers.gameover, 19, 49, colors.orange)
 
   
   if timers.gameover <= 0 then
@@ -444,8 +479,8 @@ function draw_playing()
 
   circfill(player.x+3, player.y+3, 30, colors.blue)
 
-  print("Count Down: " ..((timer_settings.play_round-game.timer)/30), 10, 20, colors.dark_purple)
-  print("Count Down: " ..((timer_settings.play_round-game.timer)/30),  9, 19, colors.orange)
+  print("count down: " ..((timer_settings.play_round-game.timer)/30), 10, 20, colors.dark_purple)
+  print("count down: " ..((timer_settings.play_round-game.timer)/30),  9, 19, colors.orange)
 
   print("score: " ..game.hits.."/"..(game.hits+game.misses), 10, 10, colors.dark_purple)
   print("score: " ..game.hits.."/"..(game.hits+game.misses),  9, 9  , colors.orange)
@@ -458,6 +493,9 @@ function draw_playing()
     print("final score! ", 49,39, colors.orange)
   end
   
+  for x in all(exploded_numbers) do 
+    print(""..x.val, x.x, x.y, colors.green)
+  end 
 
   if #explosions <= 0 then
 	  for c in all(choices) do
@@ -465,7 +503,7 @@ function draw_playing()
         circfill(c.x, c.y, c.r*1.5, colors.dark_blue)
         print(""..c.val, c.x-c.r/2, c.y-c.r/2, colors.blue)
       else
-        print(""..c.val, c.x-c.r/2, c.y-c.r/2, colors.dark_blue)
+        print(""..c.val, c.x-c.r/2, c.y-c.r/2, colors.black)
       end
 	  	
 	  end 
