@@ -33,7 +33,7 @@ function _init()
     misses = 0,
     hits = 0,
     timer = 0,
-    final_score = ""
+    final_score = 0
   }
 
   game_states = {
@@ -75,6 +75,8 @@ function _init()
   timers.start_level = 45
 
   bullets = {}
+
+  final_score = 0
 end
 
 
@@ -354,6 +356,7 @@ function update_bullets()
     if(b.y <= b.target_y) then 
       del(bullets, b) 
       game.misses += 1
+      game.final_score = flr(game.hits/(game.hits+game.misses)*100)
       sfx(4)
     end
   end   
@@ -390,8 +393,8 @@ function update_player_shot()
     for c in all(choices) do
       if 
         --c.selected and
-        abs(c.x - bullets[1].x+3) < 8 and 
-        abs(c.y - bullets[1].y+3) < 8
+        abs(c.x - bullets[1].x) < 12 and 
+        abs(c.y - bullets[1].y) < 12
       then
         --do not break because there may be more than
         --one overlay on top of the other
@@ -422,6 +425,7 @@ function update_player_shot()
     --this determines if it was a hit or a miss
     if hit then 
       game.hits += 1
+      game.final_score = flr(game.misses/(game.hits+game.misses)*100)
       sfx(3)
     end 
   end	   	 
@@ -485,7 +489,6 @@ function update_gameover()
   	  game.timer = 0 
   	  game.hits = 0
   	  game.misses = 0
-  	  game.final_score = ""
   	end 
   end
 end 
@@ -519,6 +522,11 @@ function draw_gameover()
     print("press (❎) to start", 20, 60, colors.dark_purple)
     print("press (❎) to start", 19, 59, colors.orange)
   end
+
+  if game.final_score > 0 then 
+    print("final score! "..game.final_score, 20,70, colors.dark_purple)
+    print("final score! "..game.final_score, 19,69, colors.green)
+  end
 end
 
 function draw_playing()
@@ -541,8 +549,8 @@ function draw_playing()
   print(" "..answer.a..answer.op..answer.b.."?", 79,  9, colors.orange)
   
   if game.timer >= timer_settings.play_round then 
-    print("final score! ", 50,40, colors.dark_purple)
-    print("final score! ", 49,39, colors.orange)
+    print("final score! "..game.final_score, 50,40, colors.dark_purple)
+    print("final score! "..game.final_score, 49,39, colors.orange)
   end
   
   for x in all(exploded_numbers) do 
