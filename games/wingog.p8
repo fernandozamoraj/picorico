@@ -1,5 +1,5 @@
 pico-8 cartridge // http://www.pico-8.com
-version 42
+version 43
 __lua__
 --important: this file is part of a game project and should not be modified without understanding the game logic.
 --this file contains the game logic for a space shooter game called "gaders".
@@ -14,13 +14,13 @@ __lua__
 --
 -- todos and features to implement:
 -- features
--- fix bug not waiting after game over before it can restart
--- make game over sound
--- pause screen after killed
+-- done*** fix bug not waiting after game over before it can restart
+-- done make game over sound
+-- done pause screen after killed
 -- add falling men to capture
 --      and the score has to get reset
 --add power up to blow entire screen ... maybe hold x button down
---add killer image for the game
+--done**add killer image for the game
 --limit bullets after 100 bullets a 30 cooldown
 --add repeating game music
 --fix meteors to spawn more evened out
@@ -151,6 +151,12 @@ function _init()
   enemies_destroyed = 0
 
   power_up = {
+    x = 0,
+    y = 0,
+    alive = false
+  }
+
+  screen_clear_power_up = {
     x = 0,
     y = 0,
     alive = false
@@ -732,7 +738,32 @@ function spawn_player()
   player.respawn_timer -= 1
   if player.lives > 0 and player.respawn_timer <= 0 and not player.alive then
     player.alive = true
+    player.x = 64
+    player.y = 120
+    player.sprite = player_idle
+    player.health_meter = max_health
   end
+end
+
+function trigger_player_respawn()
+  player.alive = false
+  player.respawn_timer = 90
+  player.lives -= 1
+  player.health_meter = max_health
+  player.x = 64
+  player.y = 120
+  player.sprite = player_idle
+  clear_game_objects()
+end
+
+function draw_respawn_countdown()
+  cls()
+  local countdown = max(1, ceil(player.respawn_timer / 30))
+  print("vessel destroyed!", 32, 34, 7)
+  print("relaunch in", 42, 50, 7)
+  local countdown_text = ""..countdown
+  print(countdown_text, 62, 72, 8)
+  print(countdown_text, 61, 71, 7)
 end
 
 function fire_bullets(e) 
@@ -888,6 +919,97 @@ function detect_enemy_player_bullet_collisions()
   end
 end 
 
+function detonate_screen_clear()
+  local targets = {}
+  for e in all(enemies) do
+    add(targets, e)
+  end
+
+  for e in all(targets) do
+    local color = 10
+    local life = 20
+    local points = 1
+
+    if e.breakable then
+      enemies_count = max(0, enemies_count - 1)
+      enemies_destroyed += 1
+      score += 1
+    else
+      color = 4
+      life = 12
+      points = 15
+      score += 10
+    end
+
+    add_kill_points(e.x, e.y, points)
+
+    for i=1,6 do
+      add(particles, {
+        x = e.x + 4,
+        y = e.y + 4,
+        dx = (rnd(2) - 1)*4,
+        dy = (rnd(2) - 1)*4,
+        life = life,
+        color = color
+      })
+    end
+    play_sfx(2)
+
+    del(enemies, e)
+  end
+
+  for eb in all(enemy_bullets) do
+    for i=1,4 do
+      add(particles, {
+        x = eb.x,
+        y = eb.y,
+        dx = (rnd(2) - 1)*2,
+        dy = (rnd(2) - 1)*2,
+        life = 10,
+        color = 10
+      })
+    end
+    play_sfx(2)
+    del(enemy_bullets, eb)
+  end
+
+  if screen_clear_power_up.alive then
+    for i=1,6 do
+      add(particles, {
+        x = screen_clear_power_up.x + 4,
+        y = screen_clear_power_up.y + 4,
+        dx = (rnd(2) - 1)*3,
+        dy = (rnd(2) - 1)*3,
+        life = 14,
+        color = 8
+      })
+    end
+    play_sfx(3)
+    screen_clear_power_up.alive = false
+  end
+
+  enemies = {}
+  enemy_bullets = {}
+  meteor_trails = {}
+  enemy_timer = 0
+  meteor_timer = 0
+end
+
+function detect_screen_clear_power_up_hit()
+  if not screen_clear_power_up.alive then
+    return
+  end
+
+  for b in all(bullets) do
+    if abs(b.x - screen_clear_power_up.x) < 6 and abs(b.y - screen_clear_power_up.y) < 6 then
+      del(bullets, b)
+      screen_clear_power_up.alive = false
+      detonate_screen_clear()
+      return
+    end
+  end
+end
+
 previous_score = 0
 
 ---------------------------------------------------
@@ -915,7 +1037,13 @@ function normal_level_update()
   add_star_layers()
   update_star_layers()
   update_power_up()
+  update_screen_clear_power_up()
   spawn_player()
+
+  if not player.alive then
+    return
+  end
+
   move_player_sideways()
   add_after_burner(player.x, player.y + 10)
   player_fire()
@@ -951,10 +1079,7 @@ function normal_level_update()
   if player.alive then
     -- check if player is alive and update health meter
     if player.health_meter <= 0 then
-      player.alive = false
-      player.respawn_timer = 90
-      player.lives -= 1
-      player.health_meter = max_health
+      trigger_player_respawn()
       if player.lives == 0 then
         game_over()
         game_over_triggered = true
@@ -964,10 +1089,7 @@ function normal_level_update()
 
 
   if player.health_meter <= 0 then
-    player.alive = false
-    player.respawn_timer = 90
-    player.lives -= 1
-    player.health_meter = max_health
+    trigger_player_respawn()
     if player.lives == 0 then
       game_over_triggered = true
     end 
@@ -977,6 +1099,7 @@ function normal_level_update()
       game_over()
   else 
         -- bullet-enemy collision
+    detect_screen_clear_power_up_hit()
     detect_enemy_player_bullet_collisions()
     update_particles()
     update_meteor_trails()
@@ -985,6 +1108,11 @@ function normal_level_update()
 end
 
 function normal_level_draw()
+  if not player.alive and player.lives > 0 then
+    draw_respawn_countdown()
+    return
+  end
+
   cls()
   draw_star_layers()
   draw_hud()
@@ -994,6 +1122,7 @@ function normal_level_draw()
   draw_player()
   draw_bullets()
   draw_power_up()
+  draw_screen_clear_power_up()
   draw_enemy_ships()
   draw_meteor_trails()
   draw_particles()
@@ -1037,6 +1166,7 @@ end
 function bonus_level_update()
   add_star_layers()
   update_star_layers()
+  update_screen_clear_power_up()
   spawn_player()
   move_player_sideways()
   add_after_burner(player.x, player.y + 10)
@@ -1062,6 +1192,7 @@ function bonus_level_update()
   end
 
   -- bullet-enemy collision
+  detect_screen_clear_power_up_hit()
   detect_enemy_player_bullet_collisions()  
   update_particles()
   update_after_burner()
@@ -1069,6 +1200,11 @@ end
 
 
 function bonus_level_draw()
+  if not player.alive and player.lives > 0 then
+    draw_respawn_countdown()
+    return
+  end
+
   cls()
   draw_hud()
 
@@ -1076,6 +1212,7 @@ function bonus_level_draw()
   -- draw player
   draw_player()
   draw_bullets()
+  draw_screen_clear_power_up()
   draw_enemy_ships()
   draw_particles()
   draw_after_burner()
@@ -1117,6 +1254,8 @@ function clear_game_objects()
   enemy_bullets = {}
   enemies = {}
   particles = {}
+  power_up.alive = false
+  screen_clear_power_up.alive = false
 end
 --------------------------------------------------------------
 -- game over functions
@@ -1137,7 +1276,7 @@ end
 
 function game_over_update()
   game_over_timer -= 1
-  if game_over_timer <= 0 and btnp(4) then     
+  if game_over_timer <= 0 and (btnp(4) or btnp(5)) then     
        score = 0
        level = 1
        player.lives = 3
@@ -1212,6 +1351,23 @@ function update_power_up()
   end
 end
 
+function update_screen_clear_power_up()
+  if flr(time()%15) == 0 then
+    if screen_clear_power_up.alive == false then
+      screen_clear_power_up.alive = true
+      screen_clear_power_up.x = flr(rnd(80)) + 20
+      screen_clear_power_up.y = 0
+    end
+  end
+
+  if screen_clear_power_up.alive then
+    screen_clear_power_up.y += 1
+    if screen_clear_power_up.y > 128 then
+      screen_clear_power_up.alive = false
+    end
+  end
+end
+
 function draw_power_up()
   if power_up.alive then
 
@@ -1221,6 +1377,17 @@ function draw_power_up()
 
     local s = 16 + flr(power_up.y/2)%6 
     spr(s, power_up.x, power_up.y) -- draw power-up sprite
+  end
+end
+
+function draw_screen_clear_power_up()
+  if screen_clear_power_up.alive then
+
+    if screen_clear_power_up.y < 0 then
+      return -- don't draw if not on screen
+    end
+
+    spr(34, screen_clear_power_up.x, screen_clear_power_up.y)
   end
 end
 
@@ -1344,12 +1511,12 @@ __gfx__
 00008000000000000000000000000000000000000000800000008000000000000000000000000000000000000000000000000000000000000000000000000000
 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 00090999000090000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00090009900090000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00099000990090000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00009900090990000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000999999900000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00090009900090000088880000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00099000990090000899998000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+0000990009099000089a798000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00000999999900000897a98000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00000000000000000899998000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00000000000000000088880000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
